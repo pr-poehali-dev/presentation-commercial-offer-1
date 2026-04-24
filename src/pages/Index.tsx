@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const TOTAL_SLIDES = 5;
-const PDF_EXPORT_URL = "https://functions.poehali.dev/a6a2da16-604c-4d76-9e4f-147a66f89447";
 
 export default function Index() {
   const [current, setCurrent] = useState(0);
@@ -11,6 +11,7 @@ export default function Index() {
   const [direction, setDirection] = useState<"next" | "prev">("next");
   const [printing, setPrinting] = useState(false);
   const [exportStatus, setExportStatus] = useState("");
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const goTo = useCallback(
     (index: number) => {
@@ -37,31 +38,40 @@ export default function Index() {
   const exportPDF = async () => {
     if (printing) return;
     setPrinting(true);
-    setExportStatus("Делаю скриншоты...");
 
     try {
-      const siteUrl = window.location.href.split("?")[0];
-      const res = await fetch(PDF_EXPORT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: siteUrl }),
-      });
-      const data = await res.json();
+      const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720] });
 
-      if (!data.slides || data.slides.length === 0) throw new Error("No slides");
+      for (let i = 0; i < TOTAL_SLIDES; i++) {
+        setExportStatus(`Слайд ${i + 1} из ${TOTAL_SLIDES}...`);
+        const el = slideRefs.current[i];
+        if (!el) continue;
 
-      setExportStatus("Собираю PDF...");
+        await new Promise(r => setTimeout(r, 300));
 
-      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      const W = 297, H = 210;
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#08091a",
+          logging: false,
+          imageTimeout: 0,
+          onclone: (doc) => {
+            // убираем анимации в клоне
+            const style = doc.createElement("style");
+            style.textContent = "* { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }";
+            doc.head.appendChild(style);
+          },
+        });
 
-      for (let i = 0; i < data.slides.length; i++) {
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
         if (i > 0) pdf.addPage();
-        pdf.addImage(`data:image/jpeg;base64,${data.slides[i]}`, "JPEG", 0, 0, W, H);
+        pdf.addImage(imgData, "JPEG", 0, 0, 1280, 720);
       }
 
       pdf.save("КП_Разработка_сайта.pdf");
-    } catch {
+    } catch (e) {
+      console.error(e);
       setExportStatus("Ошибка — попробуйте ещё раз");
       setTimeout(() => setExportStatus(""), 3000);
     } finally {
@@ -86,13 +96,17 @@ export default function Index() {
         {current === 4 && <Slide4 />}
       </div>
 
-      {/* All slides for print — hidden on screen */}
-      <div className="print-all">
-        <div className="print-slide"><Slide1 /></div>
-        <div className="print-slide"><Slide2 /></div>
-        <div className="print-slide"><Slide3 /></div>
-        <div className="print-slide"><Slide5 /></div>
-        <div className="print-slide"><Slide4 /></div>
+      {/* Hidden slides for PDF capture */}
+      <div className="pdf-slides-hidden">
+        {[<Slide1 />, <Slide2 />, <Slide3 />, <Slide5 />, <Slide4 />].map((SlideEl, i) => (
+          <div
+            key={i}
+            ref={el => { slideRefs.current[i] = el; }}
+            className="pdf-slide-capture"
+          >
+            {SlideEl}
+          </div>
+        ))}
       </div>
 
       {/* Dots */}
@@ -307,10 +321,7 @@ function Slide4() {
               <div className="cb-icon"><Icon name="Phone" size={17} /></div>
               <span>+7 (996) 735-49-38</span>
             </a>
-            <button className="cb-cta">
-              Обсудить проект
-              <Icon name="ArrowRight" size={15} />
-            </button>
+
           </div>
         </div>
       </div>
