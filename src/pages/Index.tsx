@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 
 const TOTAL_SLIDES = 5;
 
@@ -9,8 +7,7 @@ export default function Index() {
   const [current, setCurrent] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [direction, setDirection] = useState<"next" | "prev">("next");
-  const [exporting, setExporting] = useState(false);
-  const slideRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
 
   const goTo = useCallback(
     (index: number) => {
@@ -34,39 +31,12 @@ export default function Index() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [current, goTo]);
 
-  const exportPDF = async () => {
-    if (exporting) return;
-    setExporting(true);
-
-    const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720] });
-    const savedCurrent = current;
-
-    for (let i = 0; i < TOTAL_SLIDES; i++) {
-      await new Promise<void>((resolve) => {
-        setCurrent(i);
-        setAnimating(false);
-        setTimeout(resolve, 600);
-      });
-
-      if (slideRef.current) {
-        const canvas = await html2canvas(slideRef.current, {
-          scale: 1.5,
-          useCORS: true,
-          backgroundColor: "#08091a",
-          width: 1280,
-          height: 720,
-          windowWidth: 1280,
-          windowHeight: 720,
-        });
-        const imgData = canvas.toDataURL("image/jpeg", 0.92);
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, 0, 1280, 720);
-      }
-    }
-
-    pdf.save("КП_Разработка_сайта.pdf");
-    setCurrent(savedCurrent);
-    setExporting(false);
+  const exportPDF = () => {
+    setPrinting(true);
+    setTimeout(() => {
+      window.print();
+      setPrinting(false);
+    }, 100);
   };
 
   const animClass = animating
@@ -77,12 +47,21 @@ export default function Index() {
 
   return (
     <div className="pres-root">
-      <div ref={slideRef} className={`slide-wrapper ${exporting ? "" : animClass}`}>
+      <div className={`slide-wrapper ${animClass}`}>
         {current === 0 && <Slide1 />}
         {current === 1 && <Slide2 />}
         {current === 2 && <Slide3 />}
         {current === 3 && <Slide5 />}
         {current === 4 && <Slide4 />}
+      </div>
+
+      {/* All slides for print — hidden on screen */}
+      <div className="print-all">
+        <div className="print-slide"><Slide1 /></div>
+        <div className="print-slide"><Slide2 /></div>
+        <div className="print-slide"><Slide3 /></div>
+        <div className="print-slide"><Slide5 /></div>
+        <div className="print-slide"><Slide4 /></div>
       </div>
 
       {/* Dots */}
@@ -116,9 +95,9 @@ export default function Index() {
       <div className="pres-counter">{current + 1} / {TOTAL_SLIDES}</div>
 
       {/* Export button */}
-      <button className="pdf-btn" onClick={exportPDF} disabled={exporting}>
-        {exporting ? (
-          <><Icon name="Loader2" size={15} className="spin" />Создаю PDF...</>
+      <button className="pdf-btn" onClick={exportPDF} disabled={printing}>
+        {printing ? (
+          <><Icon name="Loader2" size={15} className="spin" />Открываю печать...</>
         ) : (
           <><Icon name="Download" size={15} />Скачать PDF</>
         )}
