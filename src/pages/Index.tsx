@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 const TOTAL_SLIDES = 5;
 
@@ -11,7 +10,6 @@ export default function Index() {
   const [direction, setDirection] = useState<"next" | "prev">("next");
   const [printing, setPrinting] = useState(false);
   const [exportStatus, setExportStatus] = useState("");
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const goTo = useCallback(
     (index: number) => {
@@ -35,55 +33,301 @@ export default function Index() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [current, goTo]);
 
-  const exportPDF = async () => {
+  const exportPDF = () => {
     if (printing) return;
     setPrinting(true);
-    setAnimating(false);
+    setExportStatus("Генерирую PDF...");
 
-    const savedCurrent = current;
-    const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720] });
+    setTimeout(() => {
+      const W = 297, H = 210; // A4 landscape mm
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
-    for (let i = 0; i < TOTAL_SLIDES; i++) {
-      setExportStatus(`Слайд ${i + 1} из ${TOTAL_SLIDES}...`);
+      const BG = "#08091a";
+      const WHITE = "#ffffff";
+      const CYAN = "#00f5c4";
+      const CORAL = "#ff6b6b";
+      const VIOLET = "#a78bfa";
+      const GOLD = "#fbbf24";
+      const DIM = "#7a7fa8";
+      const DIMMER = "#3a3f6a";
 
-      await new Promise<void>(resolve => {
-        setCurrent(i);
-        setTimeout(resolve, 700);
+      const bg = (p: jsPDF) => {
+        p.setFillColor(BG);
+        p.rect(0, 0, W, H, "F");
+      };
+
+      const label = (p: jsPDF, txt: string, x: number, y: number) => {
+        p.setFontSize(8);
+        p.setTextColor(DIM);
+        p.setFont("helvetica", "bold");
+        p.text(txt.toUpperCase(), x, y);
+      };
+
+      const heading = (p: jsPDF, lines: string[], x: number, y: number, size = 32) => {
+        p.setFontSize(size);
+        p.setFont("helvetica", "bold");
+        p.setTextColor(WHITE);
+        lines.forEach((line, i) => p.text(line, x, y + i * (size * 0.45)));
+      };
+
+      const body = (p: jsPDF, txt: string, x: number, y: number, maxW = 120) => {
+        p.setFontSize(9.5);
+        p.setFont("helvetica", "normal");
+        p.setTextColor(DIM);
+        const lines = p.splitTextToSize(txt, maxW);
+        p.text(lines, x, y);
+      };
+
+      const accent = (p: jsPDF, txt: string, color: string) => {
+        // returns segments — used inline
+        p.setTextColor(color);
+      };
+
+      const card = (p: jsPDF, x: number, y: number, w: number, h: number, borderColor: string) => {
+        p.setFillColor(14, 16, 40);
+        p.roundedRect(x, y, w, h, 3, 3, "F");
+        p.setDrawColor(borderColor);
+        p.setLineWidth(0.4);
+        p.roundedRect(x, y, w, h, 3, 3, "S");
+      };
+
+      // ─── SLIDE 1 ───────────────────────────────────────────────
+      bg(pdf);
+      // Accent orb (simulated with soft circle)
+      pdf.setFillColor(0, 50, 180);
+      pdf.circle(-10, 20, 60, "F");
+      pdf.setFillColor(8, 9, 26);
+      pdf.circle(-10, 20, 50, "F");
+
+      // Tag
+      pdf.setFillColor(30, 33, 65);
+      pdf.roundedRect(20, 18, 70, 8, 2, 2, "F");
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(CYAN);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("● КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ", 24, 23.5);
+
+      // Title
+      pdf.setFontSize(42);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(WHITE);
+      pdf.text("Разработка", 20, 50);
+      pdf.setTextColor(CYAN);
+      pdf.text("сайта", 20, 72);
+
+      // Subtitle
+      body(pdf, "Для консалтинговой компании — кастомное\nрешение под ваш бренд и задачи", 20, 87, 140);
+
+      // Chips
+      const chips = ["React", "Без конструкторов", "Под ключ"];
+      let cx = 20;
+      chips.forEach(chip => {
+        const cw = chip.length * 2.3 + 8;
+        pdf.setFillColor(30, 33, 65);
+        pdf.roundedRect(cx, 96, cw, 7, 1.5, 1.5, "F");
+        pdf.setFontSize(7);
+        pdf.setTextColor(DIM);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(chip, cx + 4, 100.5);
+        cx += cw + 4;
       });
 
-      const el = wrapperRef.current;
-      if (!el) continue;
-
-      const canvas = await html2canvas(el, {
-        scale: 1.5,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#08091a",
-        logging: false,
-        width: window.innerWidth,
-        height: window.innerHeight,
-        windowWidth: window.innerWidth,
-        windowHeight: window.innerHeight,
-        onclone: (_doc, clone) => {
-          clone.style.animation = "none";
-          clone.querySelectorAll("*").forEach((el) => {
-            (el as HTMLElement).style.animation = "none";
-            (el as HTMLElement).style.transition = "none";
-          });
-        },
+      // Info cards right
+      const infoCards = [
+        { label: "Срок", val: "7–14 дней", color: CYAN },
+        { label: "Стоимость", val: "40 000 ₽", color: CORAL },
+        { label: "Доработки", val: "5 бесплатно", color: VIOLET },
+      ];
+      infoCards.forEach((ic, i) => {
+        const cy = 30 + i * 42;
+        card(pdf, 210, cy, 70, 34, ic.color);
+        pdf.setFontSize(7);
+        pdf.setTextColor(DIM);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(ic.label, 216, cy + 10);
+        pdf.setFontSize(16);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(WHITE);
+        pdf.text(ic.val, 216, cy + 24);
       });
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.92);
-      if (i > 0) pdf.addPage();
-      const pw = pdf.internal.pageSize.getWidth();
-      const ph = pdf.internal.pageSize.getHeight();
-      pdf.addImage(imgData, "JPEG", 0, 0, pw, ph);
-    }
+      // ─── SLIDE 2 ───────────────────────────────────────────────
+      pdf.addPage();
+      bg(pdf);
+      label(pdf, "02 — О решении", 20, 22);
+      pdf.setFontSize(32);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(WHITE);
+      pdf.text("Разрабатываем", 20, 42);
+      pdf.setTextColor(CORAL);
+      pdf.text("с нуля", 20, 58);
 
-    pdf.save("КП_Разработка_сайта.pdf");
-    setCurrent(savedCurrent);
-    setPrinting(false);
-    setExportStatus("");
+      body(pdf, "На React — без конструкторов и шаблонов. Полноценный кастомный\nпродукт: дизайн, структура и логика создаются под конкретный бренд.", 20, 72, 160);
+
+      const feats = [
+        { icon: "</> ", title: "Не конструктор", desc: "Оригинальный код, без ограничений платформ", color: CYAN },
+        { icon: "♦  ", title: "Дизайн под ключ", desc: "Фирменный стиль, типографика, визуальная логика", color: CORAL },
+        { icon: "↑  ", title: "Масштабируемость", desc: "Готов к будущим доработкам и расширению", color: VIOLET },
+      ];
+      feats.forEach((f, i) => {
+        const fx = 20 + i * 93;
+        card(pdf, fx, 90, 86, 55, f.color);
+        // icon bg
+        pdf.setFillColor(20, 22, 50);
+        pdf.roundedRect(fx + 6, 96, 12, 12, 2, 2, "F");
+        pdf.setFontSize(8);
+        pdf.setTextColor(f.color);
+        pdf.text(f.icon, fx + 8, 104);
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(WHITE);
+        pdf.text(f.title, fx + 6, 118);
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(DIM);
+        const descLines = pdf.splitTextToSize(f.desc, 72);
+        pdf.text(descLines, fx + 6, 127);
+      });
+
+      // ─── SLIDE 3 ───────────────────────────────────────────────
+      pdf.addPage();
+      bg(pdf);
+      label(pdf, "03 — Состав работ", 20, 22);
+      pdf.setFontSize(32);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(WHITE);
+      pdf.text("Что входит", 20, 42);
+      pdf.setTextColor(CYAN);
+      pdf.text("в работу", 20, 58);
+
+      const works = [
+        { title: "Адаптивный дизайн", desc: "Корректно отображается на компьютере, планшете и смартфоне", color: CYAN },
+        { title: "Базовая SEO-оптимизация", desc: "Мета-теги, структура заголовков, технические параметры индексации", color: VIOLET },
+        { title: "Формы связи", desc: "Подключение форм заявок и обратной связи с уведомлениями", color: CORAL },
+        { title: "Передача исходного кода", desc: "Полные права на проект — без привязки к подрядчику", color: GOLD },
+      ];
+      works.forEach((w, i) => {
+        const row = Math.floor(i / 2), col = i % 2;
+        const wx = 20 + col * 136, wy = 72 + row * 52;
+        card(pdf, wx, wy, 128, 44, w.color);
+        pdf.setFillColor(w.color);
+        pdf.rect(wx, wy, 2.5, 44, "F");
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(WHITE);
+        pdf.text(w.title, wx + 8, wy + 14);
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(DIM);
+        const dl = pdf.splitTextToSize(w.desc, 112);
+        pdf.text(dl, wx + 8, wy + 24);
+      });
+
+      // ─── SLIDE 4 (условия) ─────────────────────────────────────
+      pdf.addPage();
+      bg(pdf);
+      label(pdf, "04 — Условия", 20, 22);
+      pdf.setFontSize(32);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(WHITE);
+      pdf.text("Ключевые", 20, 42);
+      pdf.setTextColor(CYAN);
+      pdf.text("условия", 20, 58);
+
+      const terms = [
+        { val: "40 000", unit: "₽", desc: "Фиксированная стоимость разработки", color: CYAN },
+        { val: "7–14", unit: "дней", desc: "Срок готовности с момента старта", color: VIOLET },
+        { val: "5", unit: "правок", desc: "Бесплатных доработок после сдачи", color: CORAL },
+      ];
+      terms.forEach((t, i) => {
+        const tx = 20 + i * 93;
+        card(pdf, tx, 70, 86, 70, t.color);
+        pdf.setFontSize(30);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(t.color);
+        pdf.text(t.val, tx + 8, 98);
+        pdf.setFontSize(12);
+        pdf.text(t.unit, tx + 8, 112);
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(DIM);
+        const dl = pdf.splitTextToSize(t.desc, 72);
+        pdf.text(dl, tx + 8, 124);
+      });
+
+      // Guarantee bar
+      pdf.setFillColor(14, 16, 40);
+      pdf.roundedRect(20, 152, 257, 14, 2, 2, "F");
+      pdf.setDrawColor(DIMMER);
+      pdf.setLineWidth(0.3);
+      pdf.roundedRect(20, 152, 257, 14, 2, 2, "S");
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(DIM);
+      pdf.text("✓  Все параметры фиксируются в договоре. Никаких скрытых платежей.", 28, 160.5);
+
+      // ─── SLIDE 5 (контакты) ────────────────────────────────────
+      pdf.addPage();
+      bg(pdf);
+      label(pdf, "05 — Контакты", 20, 22);
+      pdf.setFontSize(32);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(WHITE);
+      pdf.text("Свяжитесь", 20, 42);
+      pdf.setTextColor(CORAL);
+      pdf.text("с нами", 20, 58);
+
+      body(pdf, "Обсудим детали, ответим на вопросы и согласуем удобный\nформат сотрудничества. Никаких обязательств.", 20, 73, 140);
+
+      // Ready badge
+      pdf.setFillColor(0, 40, 30);
+      pdf.roundedRect(20, 82, 100, 9, 2, 2, "F");
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(CYAN);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("⏱  Готовы начать в течение 1–2 рабочих дней", 24, 88);
+
+      // Contact box
+      card(pdf, 170, 30, 110, 110, DIMMER);
+      pdf.setFontSize(7);
+      pdf.setTextColor(DIM);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("НАПИШИТЕ НАМ", 178, 42);
+
+      // email row
+      pdf.setFillColor(20, 22, 50);
+      pdf.roundedRect(178, 47, 10, 10, 2, 2, "F");
+      pdf.setFontSize(8);
+      pdf.setTextColor(DIM);
+      pdf.text("@", 181.5, 53.5);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(WHITE);
+      pdf.text("botopech@mail.ru", 192, 54);
+
+      // phone row
+      pdf.setFillColor(20, 22, 50);
+      pdf.roundedRect(178, 63, 10, 10, 2, 2, "F");
+      pdf.setFontSize(8);
+      pdf.setTextColor(DIM);
+      pdf.text("☎", 181, 69.5);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(WHITE);
+      pdf.text("+7 (996) 735-49-38", 192, 70);
+
+      // CTA button
+      pdf.setFillColor(0, 87, 255);
+      pdf.roundedRect(178, 85, 94, 14, 3, 3, "F");
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(WHITE);
+      pdf.text("Обсудить проект →", 192, 94);
+
+      pdf.save("КП_Разработка_сайта.pdf");
+      setPrinting(false);
+      setExportStatus("");
+    }, 100);
   };
 
   const animClass = animating
@@ -94,7 +338,7 @@ export default function Index() {
 
   return (
     <div className={`pres-root ${printing ? "is-exporting" : ""}`}>
-      <div ref={wrapperRef} className={`slide-wrapper ${printing ? "" : animClass}`}>
+      <div className={`slide-wrapper ${printing ? "" : animClass}`}>
         {current === 0 && <Slide1 />}
         {current === 1 && <Slide2 />}
         {current === 2 && <Slide3 />}
