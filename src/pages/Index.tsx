@@ -11,7 +11,7 @@ export default function Index() {
   const [direction, setDirection] = useState<"next" | "prev">("next");
   const [printing, setPrinting] = useState(false);
   const [exportStatus, setExportStatus] = useState("");
-  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const goTo = useCallback(
     (index: number) => {
@@ -38,46 +38,52 @@ export default function Index() {
   const exportPDF = async () => {
     if (printing) return;
     setPrinting(true);
+    setAnimating(false);
 
-    try {
-      const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720] });
+    const savedCurrent = current;
+    const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720] });
 
-      for (let i = 0; i < TOTAL_SLIDES; i++) {
-        setExportStatus(`Слайд ${i + 1} из ${TOTAL_SLIDES}...`);
-        const el = slideRefs.current[i];
-        if (!el) continue;
+    for (let i = 0; i < TOTAL_SLIDES; i++) {
+      setExportStatus(`Слайд ${i + 1} из ${TOTAL_SLIDES}...`);
 
-        await new Promise(r => setTimeout(r, 300));
+      await new Promise<void>(resolve => {
+        setCurrent(i);
+        setTimeout(resolve, 700);
+      });
 
-        const canvas = await html2canvas(el, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#08091a",
-          logging: false,
-          imageTimeout: 0,
-          onclone: (doc) => {
-            // убираем анимации в клоне
-            const style = doc.createElement("style");
-            style.textContent = "* { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }";
-            doc.head.appendChild(style);
-          },
-        });
+      const el = wrapperRef.current;
+      if (!el) continue;
 
-        const imgData = canvas.toDataURL("image/jpeg", 0.95);
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, 0, 1280, 720);
-      }
+      const canvas = await html2canvas(el, {
+        scale: 1.5,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#08091a",
+        logging: false,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+        onclone: (_doc, clone) => {
+          clone.style.animation = "none";
+          clone.querySelectorAll("*").forEach((el) => {
+            (el as HTMLElement).style.animation = "none";
+            (el as HTMLElement).style.transition = "none";
+          });
+        },
+      });
 
-      pdf.save("КП_Разработка_сайта.pdf");
-    } catch (e) {
-      console.error(e);
-      setExportStatus("Ошибка — попробуйте ещё раз");
-      setTimeout(() => setExportStatus(""), 3000);
-    } finally {
-      setPrinting(false);
-      setExportStatus("");
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      if (i > 0) pdf.addPage();
+      const pw = pdf.internal.pageSize.getWidth();
+      const ph = pdf.internal.pageSize.getHeight();
+      pdf.addImage(imgData, "JPEG", 0, 0, pw, ph);
     }
+
+    pdf.save("КП_Разработка_сайта.pdf");
+    setCurrent(savedCurrent);
+    setPrinting(false);
+    setExportStatus("");
   };
 
   const animClass = animating
@@ -87,26 +93,13 @@ export default function Index() {
     : "slide-enter";
 
   return (
-    <div className="pres-root">
-      <div className={`slide-wrapper ${animClass}`}>
+    <div className={`pres-root ${printing ? "is-exporting" : ""}`}>
+      <div ref={wrapperRef} className={`slide-wrapper ${printing ? "" : animClass}`}>
         {current === 0 && <Slide1 />}
         {current === 1 && <Slide2 />}
         {current === 2 && <Slide3 />}
         {current === 3 && <Slide5 />}
         {current === 4 && <Slide4 />}
-      </div>
-
-      {/* Hidden slides for PDF capture */}
-      <div className="pdf-slides-hidden">
-        {[<Slide1 />, <Slide2 />, <Slide3 />, <Slide5 />, <Slide4 />].map((SlideEl, i) => (
-          <div
-            key={i}
-            ref={el => { slideRefs.current[i] = el; }}
-            className="pdf-slide-capture"
-          >
-            {SlideEl}
-          </div>
-        ))}
       </div>
 
       {/* Dots */}
