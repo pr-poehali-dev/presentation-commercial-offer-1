@@ -33,14 +33,34 @@ export default function Index() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [current, goTo]);
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     if (printing) return;
     setPrinting(true);
-    setExportStatus("Генерирую PDF...");
+    setExportStatus("Загружаю шрифт...");
 
-    setTimeout(() => {
-      const W = 297, H = 210; // A4 landscape mm
-      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const W = 297, H = 210; // A4 landscape mm
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+    // Load Roboto TTF with Cyrillic support
+    const fontUrl = "https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-cyrillic-400-normal.ttf";
+    let fontLoaded = false;
+    try {
+      const resp = await fetch(fontUrl);
+      const buf = await resp.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const fontBase64 = btoa(binary);
+      pdf.addFileToVFS("Roboto.ttf", fontBase64);
+      pdf.addFont("Roboto.ttf", "Roboto", "normal");
+      pdf.addFont("Roboto.ttf", "Roboto", "bold");
+      fontLoaded = true;
+    } catch {
+      // fallback to helvetica
+    }
+
+    const FONT = fontLoaded ? "Roboto" : "helvetica";
+    setExportStatus("Генерирую PDF...");
 
       const BG = "#08091a";
       const WHITE = "#ffffff";
@@ -59,28 +79,16 @@ export default function Index() {
       const label = (p: jsPDF, txt: string, x: number, y: number) => {
         p.setFontSize(8);
         p.setTextColor(DIM);
-        p.setFont("helvetica", "bold");
+        p.setFont(FONT, "bold");
         p.text(txt.toUpperCase(), x, y);
-      };
-
-      const heading = (p: jsPDF, lines: string[], x: number, y: number, size = 32) => {
-        p.setFontSize(size);
-        p.setFont("helvetica", "bold");
-        p.setTextColor(WHITE);
-        lines.forEach((line, i) => p.text(line, x, y + i * (size * 0.45)));
       };
 
       const body = (p: jsPDF, txt: string, x: number, y: number, maxW = 120) => {
         p.setFontSize(9.5);
-        p.setFont("helvetica", "normal");
+        p.setFont(FONT, "normal");
         p.setTextColor(DIM);
         const lines = p.splitTextToSize(txt, maxW);
         p.text(lines, x, y);
-      };
-
-      const accent = (p: jsPDF, txt: string, color: string) => {
-        // returns segments — used inline
-        p.setTextColor(color);
       };
 
       const card = (p: jsPDF, x: number, y: number, w: number, h: number, borderColor: string) => {
@@ -104,12 +112,12 @@ export default function Index() {
       pdf.roundedRect(20, 18, 70, 8, 2, 2, "F");
       pdf.setFontSize(7.5);
       pdf.setTextColor(CYAN);
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont(FONT, "bold");
       pdf.text("● КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ", 24, 23.5);
 
       // Title
       pdf.setFontSize(42);
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont(FONT, "bold");
       pdf.setTextColor(WHITE);
       pdf.text("Разработка", 20, 50);
       pdf.setTextColor(CYAN);
@@ -127,7 +135,7 @@ export default function Index() {
         pdf.roundedRect(cx, 96, cw, 7, 1.5, 1.5, "F");
         pdf.setFontSize(7);
         pdf.setTextColor(DIM);
-        pdf.setFont("helvetica", "normal");
+        pdf.setFont(FONT, "normal");
         pdf.text(chip, cx + 4, 100.5);
         cx += cw + 4;
       });
@@ -143,10 +151,10 @@ export default function Index() {
         card(pdf, 210, cy, 70, 34, ic.color);
         pdf.setFontSize(7);
         pdf.setTextColor(DIM);
-        pdf.setFont("helvetica", "normal");
+        pdf.setFont(FONT, "normal");
         pdf.text(ic.label, 216, cy + 10);
         pdf.setFontSize(16);
-        pdf.setFont("helvetica", "bold");
+        pdf.setFont(FONT, "bold");
         pdf.setTextColor(WHITE);
         pdf.text(ic.val, 216, cy + 24);
       });
@@ -156,7 +164,7 @@ export default function Index() {
       bg(pdf);
       label(pdf, "02 — О решении", 20, 22);
       pdf.setFontSize(32);
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont(FONT, "bold");
       pdf.setTextColor(WHITE);
       pdf.text("Разрабатываем", 20, 42);
       pdf.setTextColor(CORAL);
@@ -179,11 +187,11 @@ export default function Index() {
         pdf.setTextColor(f.color);
         pdf.text(f.icon, fx + 8, 104);
         pdf.setFontSize(10);
-        pdf.setFont("helvetica", "bold");
+        pdf.setFont(FONT, "bold");
         pdf.setTextColor(WHITE);
         pdf.text(f.title, fx + 6, 118);
         pdf.setFontSize(8);
-        pdf.setFont("helvetica", "normal");
+        pdf.setFont(FONT, "normal");
         pdf.setTextColor(DIM);
         const descLines = pdf.splitTextToSize(f.desc, 72);
         pdf.text(descLines, fx + 6, 127);
@@ -194,7 +202,7 @@ export default function Index() {
       bg(pdf);
       label(pdf, "03 — Состав работ", 20, 22);
       pdf.setFontSize(32);
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont(FONT, "bold");
       pdf.setTextColor(WHITE);
       pdf.text("Что входит", 20, 42);
       pdf.setTextColor(CYAN);
@@ -213,11 +221,11 @@ export default function Index() {
         pdf.setFillColor(w.color);
         pdf.rect(wx, wy, 2.5, 44, "F");
         pdf.setFontSize(10);
-        pdf.setFont("helvetica", "bold");
+        pdf.setFont(FONT, "bold");
         pdf.setTextColor(WHITE);
         pdf.text(w.title, wx + 8, wy + 14);
         pdf.setFontSize(8);
-        pdf.setFont("helvetica", "normal");
+        pdf.setFont(FONT, "normal");
         pdf.setTextColor(DIM);
         const dl = pdf.splitTextToSize(w.desc, 112);
         pdf.text(dl, wx + 8, wy + 24);
@@ -228,7 +236,7 @@ export default function Index() {
       bg(pdf);
       label(pdf, "04 — Условия", 20, 22);
       pdf.setFontSize(32);
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont(FONT, "bold");
       pdf.setTextColor(WHITE);
       pdf.text("Ключевые", 20, 42);
       pdf.setTextColor(CYAN);
@@ -243,13 +251,13 @@ export default function Index() {
         const tx = 20 + i * 93;
         card(pdf, tx, 70, 86, 70, t.color);
         pdf.setFontSize(30);
-        pdf.setFont("helvetica", "bold");
+        pdf.setFont(FONT, "bold");
         pdf.setTextColor(t.color);
         pdf.text(t.val, tx + 8, 98);
         pdf.setFontSize(12);
         pdf.text(t.unit, tx + 8, 112);
         pdf.setFontSize(8);
-        pdf.setFont("helvetica", "normal");
+        pdf.setFont(FONT, "normal");
         pdf.setTextColor(DIM);
         const dl = pdf.splitTextToSize(t.desc, 72);
         pdf.text(dl, tx + 8, 124);
@@ -262,7 +270,7 @@ export default function Index() {
       pdf.setLineWidth(0.3);
       pdf.roundedRect(20, 152, 257, 14, 2, 2, "S");
       pdf.setFontSize(8);
-      pdf.setFont("helvetica", "normal");
+      pdf.setFont(FONT, "normal");
       pdf.setTextColor(DIM);
       pdf.text("✓  Все параметры фиксируются в договоре. Никаких скрытых платежей.", 28, 160.5);
 
@@ -271,7 +279,7 @@ export default function Index() {
       bg(pdf);
       label(pdf, "05 — Контакты", 20, 22);
       pdf.setFontSize(32);
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont(FONT, "bold");
       pdf.setTextColor(WHITE);
       pdf.text("Свяжитесь", 20, 42);
       pdf.setTextColor(CORAL);
@@ -284,14 +292,14 @@ export default function Index() {
       pdf.roundedRect(20, 82, 100, 9, 2, 2, "F");
       pdf.setFontSize(7.5);
       pdf.setTextColor(CYAN);
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont(FONT, "bold");
       pdf.text("⏱  Готовы начать в течение 1–2 рабочих дней", 24, 88);
 
       // Contact box
       card(pdf, 170, 30, 110, 110, DIMMER);
       pdf.setFontSize(7);
       pdf.setTextColor(DIM);
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont(FONT, "bold");
       pdf.text("НАПИШИТЕ НАМ", 178, 42);
 
       // email row
@@ -301,7 +309,7 @@ export default function Index() {
       pdf.setTextColor(DIM);
       pdf.text("@", 181.5, 53.5);
       pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
+      pdf.setFont(FONT, "normal");
       pdf.setTextColor(WHITE);
       pdf.text("botopech@mail.ru", 192, 54);
 
@@ -312,7 +320,7 @@ export default function Index() {
       pdf.setTextColor(DIM);
       pdf.text("☎", 181, 69.5);
       pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
+      pdf.setFont(FONT, "normal");
       pdf.setTextColor(WHITE);
       pdf.text("+7 (996) 735-49-38", 192, 70);
 
@@ -320,14 +328,13 @@ export default function Index() {
       pdf.setFillColor(0, 87, 255);
       pdf.roundedRect(178, 85, 94, 14, 3, 3, "F");
       pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
+      pdf.setFont(FONT, "bold");
       pdf.setTextColor(WHITE);
       pdf.text("Обсудить проект →", 192, 94);
 
       pdf.save("КП_Разработка_сайта.pdf");
       setPrinting(false);
       setExportStatus("");
-    }, 100);
   };
 
   const animClass = animating
