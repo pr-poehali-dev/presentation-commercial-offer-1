@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import jsPDF from "jspdf";
 
 const TOTAL_SLIDES = 5;
+const PDF_EXPORT_URL = "https://functions.poehali.dev/a6a2da16-604c-4d76-9e4f-147a66f89447";
 
 export default function Index() {
   const [current, setCurrent] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [direction, setDirection] = useState<"next" | "prev">("next");
   const [printing, setPrinting] = useState(false);
+  const [exportStatus, setExportStatus] = useState("");
 
   const goTo = useCallback(
     (index: number) => {
@@ -31,12 +34,40 @@ export default function Index() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [current, goTo]);
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
+    if (printing) return;
     setPrinting(true);
-    setTimeout(() => {
-      window.print();
+    setExportStatus("Делаю скриншоты...");
+
+    try {
+      const siteUrl = window.location.href.split("?")[0];
+      const res = await fetch(PDF_EXPORT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: siteUrl }),
+      });
+      const data = await res.json();
+
+      if (!data.slides || data.slides.length === 0) throw new Error("No slides");
+
+      setExportStatus("Собираю PDF...");
+
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const W = 297, H = 210;
+
+      for (let i = 0; i < data.slides.length; i++) {
+        if (i > 0) pdf.addPage();
+        pdf.addImage(`data:image/jpeg;base64,${data.slides[i]}`, "JPEG", 0, 0, W, H);
+      }
+
+      pdf.save("КП_Разработка_сайта.pdf");
+    } catch {
+      setExportStatus("Ошибка — попробуйте ещё раз");
+      setTimeout(() => setExportStatus(""), 3000);
+    } finally {
       setPrinting(false);
-    }, 100);
+      setExportStatus("");
+    }
   };
 
   const animClass = animating
@@ -97,7 +128,7 @@ export default function Index() {
       {/* Export button */}
       <button className="pdf-btn" onClick={exportPDF} disabled={printing}>
         {printing ? (
-          <><Icon name="Loader2" size={15} className="spin" />Открываю печать...</>
+          <><Icon name="Loader2" size={15} className="spin" />{exportStatus || "Создаю PDF..."}</>
         ) : (
           <><Icon name="Download" size={15} />Скачать PDF</>
         )}
